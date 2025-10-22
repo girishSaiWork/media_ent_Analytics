@@ -1,0 +1,66 @@
+{
+  "environment": "prod",
+  "workspace": {
+    "host": "https://adb-<your-prod-workspace-id>.azuredatabricks.net",
+    "workspace_id": "<prod-workspace-id>",
+    "profile": "prod"
+  },
+  "data_paths": {
+    "raw_data": "/mnt/prod/data/raw",
+    "processed_data": "/mnt/prod/data/processed",
+    "parquet_source": "/mnt/prod/parquet_data",
+    "csv_output": "/mnt/prod/csv_output",
+    "reports": "/mnt/prod/reports",
+    "logs": "/mnt/prod/logs",
+    "archive": "/mnt/prod/archive"
+  },
+  "cluster": {
+    "spark_version": "13.3.x-scala2.12",
+    "node_type": "Standard_DS5_v2",
+    "min_workers": 3,
+    "max_workers": 10,
+    "autoscale": true,
+    "autotermination_minutes": 60,
+    "spot_instances": false
+  },
+  "job_settings": {
+    "max_concurrent_runs": 1,
+    "timeout_seconds": 14400,
+    "max_retries": 2,
+    "retry_interval_millis": 300000
+  },
+  "notifications": {
+    "email": [
+      "data-ops@company.com",
+      "data-engineering-lead@company.com"
+    ],
+    "on_success": true,
+    "on_failure": true,
+    "on_start": true,
+    "webhook_url": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+  },
+  "secrets": {
+    "scope": "prod-secrets",
+    "storage_account_key": "prod-storage-key",
+    "service_principal_id": "prod-sp-id",
+    "key_vault": "prod-keyvault"
+  },
+  "feature_flags": {
+    "enable_delta_optimization": true,
+    "enable_auto_compaction": true,
+    "enable_z_ordering": true,
+    "enable_liquid_clustering": false,
+    "debug_mode": false
+  },
+  "monitoring": {
+    "enable_metrics": true,
+    "metrics_namespace": "databricks/prod/data-pipeline",
+    "log_level": "INFO",
+    "enable_alerts": true
+  },
+  "data_retention": {
+    "raw_data_days": 90,
+    "processed_data_days": 365,
+    "logs_days": 30
+  }
+}

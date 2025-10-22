@@ -1,0 +1,43 @@
+{
+  "environment": "dev",
+  "workspace": {
+    "host": "https://adb-<your-workspace-id>.azuredatabricks.net",
+    "workspace_id": "<workspace-id>",
+    "profile": "dev"
+  },
+  "data_paths": {
+    "raw_data": "/mnt/dev/data/raw",
+    "processed_data": "/mnt/dev/data/processed",
+    "parquet_source": "/mnt/dev/parquet_data",
+    "csv_output": "/mnt/dev/csv_output",
+    "reports": "/mnt/dev/reports",
+    "logs": "/mnt/dev/logs"
+  },
+  "cluster": {
+    "spark_version": "13.3.x-scala2.12",
+    "node_type": "Standard_DS3_v2",
+    "num_workers": 2,
+    "autoscale": false,
+    "autotermination_minutes": 30
+  },
+  "job_settings": {
+    "max_concurrent_runs": 5,
+    "timeout_seconds": 3600,
+    "max_retries": 1
+  },
+  "notifications": {
+    "email": ["dev-team@company.com"],
+    "on_success": false,
+    "on_failure": true
+  },
+  "secrets": {
+    "scope": "dev-secrets",
+    "storage_account_key": "dev-storage-key",
+    "service_principal_id": "dev-sp-id"
+  },
+  "feature_flags": {
+    "enable_delta_optimization": true,
+    "enable_auto_compaction": false,
+    "debug_mode": true
+  }
+}
