@@ -1,0 +1,263 @@
+name: Deploy Databricks Asset Bundle
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'release/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - qa
+          - uat
+          - prod
+
+env:
+  DATABRICKS_CLI_VERSION: "0.209.0"
+
+jobs:
+  # ==========================================
+  # Validation Job - Runs on all PRs
+  # ==========================================
+  validate:
+    name: Validate Bundle
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install Databricks CLI
+        run: |
+          pip install databricks-cli==${{ env.DATABRICKS_CLI_VERSION }}
+          databricks --version
+      
+      - name: Validate bundle configuration
+        run: |
+          databricks bundle validate -t dev
+      
+      - name: Run bundle tests (if available)
+        run: |
+          if [ -f "tests/run_tests.sh" ]; then
+            bash tests/run_tests.sh
+          fi
+
+  # ==========================================
+  # Deploy to DEV - Auto deploy on develop branch
+  # ==========================================
+  deploy-dev:
+    name: Deploy to DEV
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    needs: validate
+    environment: dev
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install Databricks CLI
+        run: pip install databricks-cli==${{ env.DATABRICKS_CLI_VERSION }}
+      
+      - name: Configure Databricks Authentication
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_DEV_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_DEV_TOKEN }}
+        run: |
+          echo "DATABRICKS_HOST=$DATABRICKS_HOST" >> $GITHUB_ENV
+          echo "DATABRICKS_TOKEN=$DATABRICKS_TOKEN" >> $GITHUB_ENV
+      
+      - name: Deploy to DEV
+        run: |
+          databricks bundle deploy -t dev
+      
+      - name: Run smoke tests
+        run: |
+          databricks bundle run data_pipeline_job -t dev --no-wait
+      
+      - name: Post deployment notification
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "text": "DEV Deployment ${{ job.status }}: ${{ github.repository }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*DEV Deployment ${{ job.status }}*\n*Repository:* ${{ github.repository }}\n*Branch:* ${{ github.ref_name }}\n*Commit:* ${{ github.sha }}"
+                  }
+                }
+              ]
+            }
+
+  # ==========================================
+  # Deploy to QA - Auto deploy on main branch
+  # ==========================================
+  deploy-qa:
+    name: Deploy to QA
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: validate
+    environment: qa
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install Databricks CLI
+        run: pip install databricks-cli==${{ env.DATABRICKS_CLI_VERSION }}
+      
+      - name: Configure Databricks Authentication
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_QA_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_QA_TOKEN }}
+        run: |
+          echo "DATABRICKS_HOST=$DATABRICKS_HOST" >> $GITHUB_ENV
+          echo "DATABRICKS_TOKEN=$DATABRICKS_TOKEN" >> $GITHUB_ENV
+      
+      - name: Deploy to QA
+        run: |
+          databricks bundle deploy -t qa
+      
+      - name: Run integration tests
+        run: |
+          databricks bundle run data_pipeline_job -t qa --wait
+          # Add additional test validations here
+
+  # ==========================================
+  # Deploy to UAT - Manual approval required
+  # ==========================================
+  deploy-uat:
+    name: Deploy to UAT
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push'
+    needs: validate
+    environment: 
+      name: uat
+      url: https://your-databricks-uat.azuredatabricks.net
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install Databricks CLI
+        run: pip install databricks-cli==${{ env.DATABRICKS_CLI_VERSION }}
+      
+      - name: Configure Databricks Authentication
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_UAT_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_UAT_TOKEN }}
+        run: |
+          echo "DATABRICKS_HOST=$DATABRICKS_HOST" >> $GITHUB_ENV
+          echo "DATABRICKS_TOKEN=$DATABRICKS_TOKEN" >> $GITHUB_ENV
+      
+      - name: Deploy to UAT
+        run: |
+          databricks bundle deploy -t uat
+      
+      - name: Create deployment tag
+        run: |
+          git tag -a "uat-$(date +%Y%m%d-%H%M%S)" -m "UAT deployment from ${{ github.sha }}"
+          git push origin --tags
+
+  # ==========================================
+  # Deploy to PROD - Manual trigger with approval
+  # ==========================================
+  deploy-prod:
+    name: Deploy to PROD
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'prod'
+    needs: validate
+    environment: 
+      name: prod
+      url: https://your-databricks-prod.azuredatabricks.net
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install Databricks CLI
+        run: pip install databricks-cli==${{ env.DATABRICKS_CLI_VERSION }}
+      
+      - name: Configure Databricks Authentication
+        env:
+          DATABRICKS_HOST: ${{ secrets.DATABRICKS_PROD_HOST }}
+          DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_PROD_TOKEN }}
+        run: |
+          echo "DATABRICKS_HOST=$DATABRICKS_HOST" >> $GITHUB_ENV
+          echo "DATABRICKS_TOKEN=$DATABRICKS_TOKEN" >> $GITHUB_ENV
+      
+      - name: Backup current PROD configuration
+        run: |
+          databricks workspace export-dir /Shared/.bundle/data-pipeline-bundle/prod ./backup-$(date +%Y%m%d) --overwrite || true
+      
+      - name: Deploy to PROD
+        run: |
+          databricks bundle deploy -t prod
+      
+      - name: Verify deployment
+        run: |
+          databricks bundle validate -t prod
+      
+      - name: Create production release tag
+        run: |
+          git tag -a "prod-$(date +%Y%m%d-%H%M%S)" -m "Production deployment from ${{ github.sha }}"
+          git push origin --tags
+      
+      - name: Post production deployment notification
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "text": "🚀 PRODUCTION Deployment ${{ job.status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*🚀 PRODUCTION Deployment ${{ job.status }}*\n*Repository:* ${{ github.repository }}\n*Deployed by:* ${{ github.actor }}\n*Commit:* ${{ github.sha }}"
+                  }
+                }
+              ]
+            }

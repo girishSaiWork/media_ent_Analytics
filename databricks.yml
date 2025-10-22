@@ -1,0 +1,230 @@
+# Databricks Asset Bundle Configuration
+# This is the root configuration file for your DAB project
+
+bundle:
+  name: data-pipeline-bundle
+  
+# Include additional configuration files
+include:
+  - resources/**/*.yml
+
+# Variables that can be referenced across all environments
+variables:
+  project_name:
+    description: "Project name used for naming resources"
+    default: "data-pipeline"
+  
+  notebook_path:
+    description: "Path to notebooks in workspace"
+    default: "/notebooks"
+
+# Workspace configuration
+workspace:
+  # Root path where bundle resources will be deployed
+  # This will be combined with environment-specific paths
+  root_path: "/Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}"
+
+# Artifacts configuration - defines what gets uploaded to workspace
+artifacts:
+  default:
+    type: whl
+    path: .
+    files:
+      - source: notebooks/**/*.py
+      - source: notebooks/**/*.ipynb
+      - source: parquet_2_csv.py
+
+# Target definitions for each environment
+targets:
+  # ========================================
+  # DEVELOPMENT ENVIRONMENT
+  # ========================================
+  dev:
+    mode: development
+    default: true
+    
+    workspace:
+      host: https://adb-<workspace-id>.azuredatabricks.net
+      
+    variables:
+      environment:
+        default: "dev"
+      data_source_path:
+        default: "/mnt/dev/data"
+      csv_output_path:
+        default: "/mnt/dev/csv_output"
+      parquet_source_path:
+        default: "/mnt/dev/parquet_data"
+    
+    resources:
+      jobs:
+        data_pipeline_job:
+          name: "${var.project_name}-job-${var.environment}"
+          
+          job_clusters:
+            - job_cluster_key: main_cluster
+              new_cluster:
+                spark_version: "13.3.x-scala2.12"
+                node_type_id: "Standard_DS3_v2"
+                num_workers: 2
+                spark_conf:
+                  "spark.databricks.delta.preview.enabled": "true"
+                  "spark.databricks.cluster.profile": "singleNode"
+                custom_tags:
+                  Environment: "dev"
+                  Project: "${var.project_name}"
+  
+  # ========================================
+  # QA ENVIRONMENT
+  # ========================================
+  qa:
+    mode: development
+    
+    workspace:
+      host: https://adb-<workspace-id>.azuredatabricks.net
+      root_path: "/Workspace/Shared/.bundle/${bundle.name}/${bundle.target}"
+      
+    variables:
+      environment:
+        default: "qa"
+      data_source_path:
+        default: "/mnt/qa/data"
+      csv_output_path:
+        default: "/mnt/qa/csv_output"
+      parquet_source_path:
+        default: "/mnt/qa/parquet_data"
+    
+    resources:
+      jobs:
+        data_pipeline_job:
+          name: "${var.project_name}-job-${var.environment}"
+          
+          job_clusters:
+            - job_cluster_key: main_cluster
+              new_cluster:
+                spark_version: "13.3.x-scala2.12"
+                node_type_id: "Standard_DS3_v2"
+                num_workers: 2
+                spark_conf:
+                  "spark.databricks.delta.preview.enabled": "true"
+                custom_tags:
+                  Environment: "qa"
+                  Project: "${var.project_name}"
+          
+          # QA-specific: Run on schedule for automated testing
+          schedule:
+            quartz_cron_expression: "0 0 2 * * ?"  # 2 AM daily
+            timezone_id: "UTC"
+            pause_status: "PAUSED"
+  
+  # ========================================
+  # UAT ENVIRONMENT
+  # ========================================
+  uat:
+    mode: production
+    
+    workspace:
+      host: https://adb-<workspace-id>.azuredatabricks.net
+      root_path: "/Workspace/Shared/.bundle/${bundle.name}/${bundle.target}"
+      
+    variables:
+      environment:
+        default: "uat"
+      data_source_path:
+        default: "/mnt/uat/data"
+      csv_output_path:
+        default: "/mnt/uat/csv_output"
+      parquet_source_path:
+        default: "/mnt/uat/parquet_data"
+    
+    resources:
+      jobs:
+        data_pipeline_job:
+          name: "${var.project_name}-job-${var.environment}"
+          
+          job_clusters:
+            - job_cluster_key: main_cluster
+              new_cluster:
+                spark_version: "13.3.x-scala2.12"
+                node_type_id: "Standard_DS4_v2"
+                num_workers: 3
+                spark_conf:
+                  "spark.databricks.delta.preview.enabled": "true"
+                custom_tags:
+                  Environment: "uat"
+                  Project: "${var.project_name}"
+                  CostCenter: "Engineering"
+          
+          max_concurrent_runs: 1
+          timeout_seconds: 7200
+          
+          # Email notifications for UAT
+          email_notifications:
+            on_failure:
+              - uat-team@company.com
+  
+  # ========================================
+  # PRODUCTION ENVIRONMENT
+  # ========================================
+  prod:
+    mode: production
+    
+    workspace:
+      host: https://adb-<workspace-id>.azuredatabricks.net
+      root_path: "/Workspace/Shared/.bundle/${bundle.name}/${bundle.target}"
+      
+    variables:
+      environment:
+        default: "prod"
+      data_source_path:
+        default: "/mnt/prod/data"
+      csv_output_path:
+        default: "/mnt/prod/csv_output"
+      parquet_source_path:
+        default: "/mnt/prod/parquet_data"
+    
+    resources:
+      jobs:
+        data_pipeline_job:
+          name: "${var.project_name}-job-${var.environment}"
+          
+          job_clusters:
+            - job_cluster_key: main_cluster
+              new_cluster:
+                spark_version: "13.3.x-scala2.12"
+                node_type_id: "Standard_DS5_v2"
+                num_workers: 5
+                autoscale:
+                  min_workers: 3
+                  max_workers: 10
+                spark_conf:
+                  "spark.databricks.delta.preview.enabled": "true"
+                  "spark.databricks.adaptive.enabled": "true"
+                custom_tags:
+                  Environment: "prod"
+                  Project: "${var.project_name}"
+                  CostCenter: "DataEngineering"
+                  Criticality: "High"
+          
+          max_concurrent_runs: 1
+          timeout_seconds: 14400
+          
+          # Production schedule
+          schedule:
+            quartz_cron_expression: "0 0 1 * * ?"  # 1 AM daily
+            timezone_id: "UTC"
+            pause_status: "UNPAUSED"
+          
+          # Production notifications
+          email_notifications:
+            on_start:
+              - data-ops@company.com
+            on_success:
+              - data-ops@company.com
+            on_failure:
+              - data-ops@company.com
+              - data-engineering-lead@company.com
+          
+          # Retry policy for production
+          max_retries: 2
+          min_retry_interval_millis: 300000  # 5 minutes
