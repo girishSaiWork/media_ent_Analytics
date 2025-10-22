@@ -2,31 +2,39 @@
 
 This repository contains a complete Databricks Asset Bundle (DAB) setup for deploying data pipelines across multiple environments (DEV → QA → UAT → PROD).
 
-## 📁 Project Structure(Example)
-
+## 📁 Project Structure
 ```
-.
-├── databricks.yml                    # Root DAB configuration file
+Asset Bundles/
+├── databricks.yml                      # DAB configuration (multi-env)
 ├── resources/
 │   └── jobs/
-│       └── data_pipeline_job.yml    # Job definition with task workflow
-├── config/
-│   ├── dev.json                     # DEV environment config
-│   ├── qa.json                      # QA environment config
-│   ├── uat.json                     # UAT environment config
-│   └── prod.json                    # PROD environment config
-├── notebooks/                        # Databricks notebooks
-│   ├── 01_data_validation.py
-│   ├── 02_data_processing.py
-│   ├── 03_data_quality.py
-│   └── 04_reporting.py
-├── parquet_2_csv.py                 # Conversion script
-├── csv_data_source/                 # CSV data files
-├── parquet_data_source/             # Parquet data files
-├── .github/
-│   └── workflows/
-│       └── deploy-dabs.yml          # GitHub Actions CI/CD pipeline
-└── README.md                        # This file
+│       └── data_pipeline_job.yml      # Job definition
+├── notebooks/
+│   ├── bronze_loader.ipynb            # Bronze layer ingestion
+│   ├── silver_assets_loader.ipynb     # Silver: Assets transformation
+│   ├── silver_delivery.ipynb          # Silver: Delivery metrics
+│   ├── silver_devices.ipynb           # Silver: Device data
+│   ├── silver_geo.ipynb               # Silver: Geographic data
+│   ├── silver_metrics.ipynb           # Silver: Performance metrics
+│   ├── gold_executive_summary.ipynb   # Gold: Executive KPIs
+│   ├── gold_content_performance.ipynb # Gold: Content analytics
+│   ├── gold_delivery_quality.ipynb    # Gold: Delivery quality
+│   ├── gold_device_analytics.ipynb    # Gold: Device insights
+│   ├── gold_geographic_analytics.ipynb# Gold: Geographic analytics
+│   └── config.py                      # Shared configuration
+├── parquet_data_source/               # Source Parquet files
+│   ├── assets.parquet
+│   ├── delivery.parquet
+│   ├── devices.parquet
+│   ├── geo.parquet
+│   └── metrics.parquet
+├── csv_data_source/                   # CSV exports
+├── config/                            # Environment configs
+│   ├── dev.json
+│   └── prod.json
+└── scripts/                           # Deployment scripts
+    ├── deploy.ps1
+    └── deploy.sh
 ```
 
 ## 🎯 What are Databricks Asset Bundles?
